@@ -2,8 +2,9 @@ from splinter import Browser
 from bs4 import BeautifulSoup as soup
 import pandas as pd
 import datetime as dt
+from webdriver_manager.chrome import ChromeDriverManager
 
-executable_path = {'executable_path':'/Users/justinberry/Downloads/chromedriver'}
+executable_path = {'executable_path': ChromeDriverManager().install()}
 browser = Browser('chrome', **executable_path, headless=True)
 
 def mars_news(browser):
@@ -62,7 +63,35 @@ def mars_facts():
 
     df.columns=['Description', 'Mars']
     df.set_index('Description', inplace=True)
-    return df.to_html()
+    return df.to_html(classes=('table')).replace("dataframe ", "")
+
+def hemi_images(browser):
+
+    url = 'https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars'
+    browser.visit(url)
+    hemisphere_image_urls = []
+    # visit the url with the images we need and parse the html
+    # for links that lead to the high-res jpgs. save to a list.
+    html = browser.html
+    hemi_soup = soup(html,'html.parser')
+
+    try:
+        hemi_links = hemi_soup.find_all('div', class_='item')
+    except AttributeError:
+        return None
+
+    hemi_links = [i.find('a').get('href') for i in hemi_links]
+
+    # visit each link, save the high-res url and title to a list as a dictionary.
+    for i in hemi_links:
+        browser.visit('https://astrogeology.usgs.gov'+ i)
+        hi_res_html = browser.html
+        hi_res_soup = soup(hi_res_html, 'html.parser')
+        image_link = hi_res_soup.find('div',class_='downloads').find('a').get('href')
+        title = hi_res_soup.find('div',class_='content').find('h2').get_text()
+        hemisphere_image_urls.append({'img_url':image_link, 'title':title})
+
+    return hemisphere_image_urls
 
 def scrape_all():
     exec_path = {'executable_path':'/Users/justinberry/Downloads/chromedriver'}
@@ -74,6 +103,7 @@ def scrape_all():
         "news_paragraph": news_paragraph,
         "featured_image": featured_image(browser),
         "facts": mars_facts(),
+        "hemispheres": hemi_images(browser),
         "last_modified": dt.datetime.now()
     }
     
